@@ -27,10 +27,23 @@ import TeacherStudents from './pages/teacher/Students';
 import { ThemeProvider } from './context/ThemeContext';
 
 const ProtectedRoute = ({ children, allowedRole }) => {
-  const { currentUser } = useAuth();
-  if (!currentUser) return <Navigate to="/login" />;
-  if (allowedRole && currentUser.role !== allowedRole) {
-    return <Navigate to={`/${currentUser.role}/dashboard`} />;
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!currentUser) return <Navigate to="/login" replace />;
+
+  const userRole = (currentUser.role === 'instructor' || currentUser.role === 'teacher') ? 'teacher' : (currentUser.role === 'admin' ? 'admin' : 'student');
+  const targetAllowed = (allowedRole === 'instructor' || allowedRole === 'teacher') ? 'teacher' : allowedRole;
+
+  if (targetAllowed && userRole !== targetAllowed && userRole !== 'admin') {
+    return <Navigate to={`/${userRole === 'teacher' ? 'teacher' : 'student'}/dashboard`} replace />;
   }
   return children;
 };

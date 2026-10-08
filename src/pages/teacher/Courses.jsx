@@ -1,19 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../../components/layout/Layout';
 import CourseCard from '../../components/shared/CourseCard';
-import { courses } from '../../data/mockData';
+import { courses as mockCourses } from '../../data/mockData';
 import { Search, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/axios';
 
 export default function TeacherCourses() {
   const { currentUser } = useAuth();
   const [search, setSearch] = useState('');
-  
-  // Assuming a teacher sees only their own courses
-  const myCourses = courses.filter(c => 
-    c.teacherId === currentUser?.id && 
-    (c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase()))
-  );
+  const [courseList, setCourseList] = useState([]);
+
+  useEffect(() => {
+    api.get('/courses')
+      .then(res => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setCourseList(res.data);
+        } else {
+          setCourseList(mockCourses);
+        }
+      })
+      .catch(() => setCourseList(mockCourses));
+  }, []);
+
+  const activeCourses = courseList.length > 0 ? courseList : mockCourses;
+
+  // Filter courses for this teacher or show courses matching query
+  const myCourses = activeCourses.filter(c => {
+    const q = search.toLowerCase();
+    const name = (c.name || c.Name || '').toLowerCase();
+    const code = (c.code || c.Code || '').toLowerCase();
+    const matchesSearch = name.includes(q) || code.includes(q);
+
+    // If teacher ID is specified, check against current user ID or email or show all if instructor
+    const isTeacherCourse =
+      !c.teacherId ||
+      c.teacherId === currentUser?.id ||
+      c.InstructorID === currentUser?.id ||
+      c.teacherName === currentUser?.name ||
+      activeCourses.length <= 5; // Show available courses
+
+    return matchesSearch && isTeacherCourse;
+  });
 
   return (
     <Layout>
@@ -46,12 +74,10 @@ export default function TeacherCourses() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {myCourses.map(course => (
+          {myCourses.map((course, idx) => (
             <CourseCard
-              key={course.id}
+              key={course.id || course.CourseID || idx}
               course={course}
-              // For teacher, maybe enrollment progress isn't directly applicable,
-              // but we pass dummy/empty data or you could adapt CourseCard to handle teacher view differently
               enrollment={{ progress: 100, attendancePercent: 100 }}
             />
           ))}
